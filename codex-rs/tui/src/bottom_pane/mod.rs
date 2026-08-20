@@ -1857,6 +1857,12 @@ impl BottomPane {
         }
     }
 
+    pub(crate) fn set_status_line_assistant_summary_fallback(&mut self, answer: &str) {
+        if self.composer_context.set_assistant_summary_fallback(answer) {
+            self.request_redraw();
+        }
+    }
+
     pub(crate) fn status_line_session_summary_instruction(&self) -> Option<String> {
         self.composer_context.session_summary_instruction()
     }

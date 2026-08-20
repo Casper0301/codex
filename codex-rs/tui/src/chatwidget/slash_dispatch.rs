@@ -397,6 +397,15 @@ impl ChatWidget {
             SlashCommand::Logout => {
                 self.app_event_tx.send(AppEvent::Logout);
             }
+            SlashCommand::Reload => {
+                if self.thread_id.is_none() {
+                    self.add_error_message(
+                        "Session is still starting; try /reload again in a moment.".to_string(),
+                    );
+                    return;
+                }
+                self.app_event_tx.send(AppEvent::Exit(ExitMode::Reload));
+            }
             SlashCommand::Copy => {
                 self.copy_last_agent_markdown();
             }
@@ -1131,6 +1140,7 @@ impl ChatWidget {
             | SlashCommand::Quit
             | SlashCommand::Exit
             | SlashCommand::Logout
+            | SlashCommand::Reload
             | SlashCommand::Mention
             | SlashCommand::Skills
             | SlashCommand::Import

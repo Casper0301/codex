@@ -7154,6 +7154,22 @@ async fn shutdown_first_exit_returns_immediate_exit_when_shutdown_submit_fails()
 }
 
 #[tokio::test]
+async fn reload_exit_preserves_the_distinct_reload_reason_after_shutdown() {
+    let mut app = make_test_app().await;
+    app.active_thread_id = Some(ThreadId::new());
+
+    let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(
+        app.chat_widget.config_ref(),
+    ))
+    .await
+    .expect("embedded app server");
+    let control = Box::pin(app.handle_exit_mode(&mut app_server, ExitMode::Reload)).await;
+
+    assert_eq!(app.pending_shutdown_exit_thread_id, None);
+    assert!(matches!(control, AppRunControl::Exit(ExitReason::Reload)));
+}
+
+#[tokio::test]
 async fn shutdown_first_exit_uses_app_server_shutdown_without_submitting_op() {
     let (mut app, _app_event_rx, mut op_rx) = Box::pin(make_test_app_with_channels()).await;
     let thread_id = ThreadId::new();

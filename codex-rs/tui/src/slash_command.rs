@@ -60,6 +60,7 @@ pub enum SlashCommand {
     Apps,
     Plugins,
     Logout,
+    Reload,
     Quit,
     Exit,
     Feedback,
@@ -140,6 +141,7 @@ impl SlashCommand {
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
             SlashCommand::Logout => "log out of Codex",
+            SlashCommand::Reload => "reload Codex and resume this session",
             SlashCommand::Rollout => "print the rollout file path",
             SlashCommand::TestApproval => "test approval request",
         }
@@ -212,6 +214,7 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Clear
             | SlashCommand::Logout
+            | SlashCommand::Reload
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate => false,
             SlashCommand::Diff

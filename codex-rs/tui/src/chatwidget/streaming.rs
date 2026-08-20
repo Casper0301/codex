@@ -331,6 +331,9 @@ impl ChatWidget {
         if matches!(item.phase, Some(MessagePhase::FinalAnswer) | None) {
             if let Some(summary) = parsed.session_summary.as_deref() {
                 self.bottom_pane.set_status_line_session_summary(summary);
+            } else if !parsed.visible_markdown.is_empty() {
+                self.bottom_pane
+                    .set_status_line_assistant_summary_fallback(&parsed.visible_markdown);
             }
             if !parsed.visible_markdown.is_empty() {
                 self.record_agent_markdown(&parsed.visible_markdown);

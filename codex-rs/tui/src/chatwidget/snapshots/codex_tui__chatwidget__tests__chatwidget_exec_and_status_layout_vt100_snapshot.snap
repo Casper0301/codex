@@ -1,8 +1,8 @@
 ---
 source: tui/src/chatwidget/tests/status_and_layout.rs
+assertion_line: 5638
 expression: normalize_snapshot_paths(term.backend().vt100().screen().contents())
 ---
-
 
 
 
@@ -38,6 +38,7 @@ expression: normalize_snapshot_paths(term.backend().vt100().screen().contents())
 
 • Investigating rendering code (0s • esc to interrupt)
 
+🧠 Session · I’m going to search the repo for where “Change Approved” is render…
 
 › Summarize recent commits
 

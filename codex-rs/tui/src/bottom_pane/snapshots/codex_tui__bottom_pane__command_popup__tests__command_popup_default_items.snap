@@ -1,5 +1,6 @@
 ---
 source: tui/src/bottom_pane/command_popup.rs
+assertion_line: 430
 expression: commands
 ---
 /model - choose what model and reasoning effort to use
@@ -37,6 +38,7 @@ expression: commands
 /pets - choose or hide the terminal pet
 /mcp - list configured MCP tools; use /mcp verbose for details
 /logout - log out of Codex
+/reload - reload Codex and resume this session
 /exit - exit Codex
 /feedback - send logs to maintainers
 /rollout - print the rollout file path

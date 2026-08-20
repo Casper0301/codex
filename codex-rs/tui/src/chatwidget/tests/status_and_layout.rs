@@ -4055,6 +4055,47 @@ async fn status_line_context_renders_session_and_last_prompt_above_composer() {
 }
 
 #[tokio::test]
+async fn status_line_context_falls_back_to_a_completed_answer_without_a_marker() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
+    chat.show_welcome_banner = false;
+    chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
+    chat.refresh_status_line();
+    chat.on_user_message_display(ChatWidget::user_message_display_from_parts(
+        "Make the session summary update in real time.".to_string(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ));
+
+    chat.on_agent_message_item_completed(
+        AgentMessageItem {
+            id: "markerless-summary-message".to_string(),
+            content: vec![AgentMessageContent::Text {
+                text: "Implemented reliable live session-summary fallbacks.".to_string(),
+            }],
+            phase: Some(MessagePhase::FinalAnswer),
+            memory_citation: None,
+        },
+        "markerless-summary-turn",
+        /*from_replay*/ false,
+    );
+
+    let width = 80;
+    let height = chat.desired_height(width);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("create terminal");
+    terminal
+        .draw(|f| chat.render(f.area(), f.buffer_mut()))
+        .expect("draw markerless status-line context");
+    let rendered = normalized_backend_snapshot(terminal.backend());
+
+    assert!(rendered.contains("🧠 Session · Implemented reliable live session-summary fallbacks."));
+    assert!(!rendered.contains("Summary pending"));
+}
+
+#[tokio::test]
 async fn replay_restores_latest_ai_session_summary() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;

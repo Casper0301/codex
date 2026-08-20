@@ -24,6 +24,7 @@ use codex_exec::Cli as ExecCli;
 use codex_exec::Command as ExecCommand;
 use codex_exec::ReviewArgs;
 use codex_execpolicy::ExecPolicyCheckCommand;
+use codex_protocol::ThreadId;
 use codex_responses_api_proxy::Args as ResponsesApiProxyArgs;
 use codex_rollout_trace::REDUCED_STATE_FILE_NAME;
 use codex_rollout_trace::replay_bundle;
@@ -41,6 +42,7 @@ use std::collections::HashSet;
 use std::io::IsTerminal;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 use supports_color::Stream;
 
@@ -759,12 +761,20 @@ fn format_exit_messages(exit_info: AppExitInfo, color_enabled: bool) -> Vec<Stri
 
 /// Handle the app exit and print the results. Optionally run the update action.
 fn handle_app_exit(exit_info: AppExitInfo) -> anyhow::Result<()> {
+    if matches!(exit_info.exit_reason, ExitReason::Reload) {
+        let thread_id = exit_info.thread_id.ok_or_else(|| {
+            anyhow::anyhow!("cannot reload Codex before the current session has an ID")
+        })?;
+        return reload_cli(thread_id);
+    }
+
     let is_fatal = match &exit_info.exit_reason {
         ExitReason::Fatal(message) => {
             eprintln!("ERROR: {message}");
             true
         }
         ExitReason::UserRequested => false,
+        ExitReason::Reload => unreachable!("reload exits are handled before normal exit output"),
     };
 
     let update_action = exit_info.update_action;
@@ -780,6 +790,30 @@ fn handle_app_exit(exit_info: AppExitInfo) -> anyhow::Result<()> {
         run_update_action(action)?;
     }
     Ok(())
+}
+
+fn build_reload_command(executable: PathBuf, thread_id: ThreadId) -> Command {
+    let mut command = Command::new(executable);
+    command.args(["resume", &thread_id.to_string()]);
+    command
+}
+
+fn reload_cli(thread_id: ThreadId) -> anyhow::Result<()> {
+    let executable = std::env::current_exe()?;
+    let mut command = build_reload_command(executable, thread_id);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let error = command.exec();
+        Err(error.into())
+    }
+
+    #[cfg(not(unix))]
+    {
+        command.spawn()?;
+        Ok(())
+    }
 }
 
 /// Run the update action and print the result.
@@ -3510,6 +3544,22 @@ mod tests {
         };
         let lines = format_exit_messages(exit_info, /*color_enabled*/ false);
         assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn reload_command_resumes_the_exiting_thread() {
+        let thread_id = ThreadId::from_string("123e4567-e89b-12d3-a456-426614174000").unwrap();
+
+        let command = build_reload_command(PathBuf::from("/tmp/codex-next"), thread_id);
+
+        assert_eq!(command.get_program(), "/tmp/codex-next");
+        assert_eq!(
+            command
+                .get_args()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect::<Vec<_>>(),
+            vec!["resume", "123e4567-e89b-12d3-a456-426614174000"]
+        );
     }
 
     #[test]

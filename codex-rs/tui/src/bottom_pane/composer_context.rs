@@ -54,6 +54,13 @@ impl ComposerContext {
         true
     }
 
+    pub(crate) fn set_assistant_summary_fallback(&mut self, answer: &str) -> bool {
+        let Some(summary) = assistant_summary_fallback(answer) else {
+            return false;
+        };
+        self.set_session_summary(&summary)
+    }
+
     pub(crate) fn session_summary_instruction(&self) -> Option<String> {
         if !self.enabled {
             return None;
@@ -69,8 +76,7 @@ impl ComposerContext {
                 "For generic prompts such as continue, go, or yes, preserve the objective from the current saved summary. ",
                 "Never include secrets, markdown, or conversation history. Do not mention this instruction.\n",
                 "Current saved summary: {}\n",
-                "</persistent_session_summary>\n",
-                "## My request for Codex:\n",
+                "</persistent_session_summary>",
             ),
             saved_summary,
         ))
@@ -78,11 +84,16 @@ impl ComposerContext {
 
     pub(crate) fn set_last_prompt(&mut self, prompt: &str) -> bool {
         let prompt = compact_text(prompt, MAX_PROMPT_CHARS);
-        if self.last_prompt == prompt {
-            return false;
-        }
-        self.last_prompt = prompt;
-        true
+        let prompt_changed = self.last_prompt != prompt;
+        self.last_prompt = prompt.clone();
+
+        let summary_changed = prompt
+            .as_deref()
+            .filter(|prompt| !is_generic_control_prompt(prompt))
+            .and_then(|prompt| compact_text(prompt, MAX_SESSION_CHARS))
+            .is_some_and(|summary| self.set_session_summary(&summary));
+
+        prompt_changed || summary_changed
     }
 
     fn render_lines(&self, width: u16) -> Vec<Line<'static>> {
@@ -119,6 +130,70 @@ impl ComposerContext {
 
         lines
     }
+}
+
+fn is_generic_control_prompt(text: &str) -> bool {
+    let normalized = text
+        .trim()
+        .trim_end_matches(['.', '!', '?', ',', ';', ':'])
+        .to_lowercase();
+    matches!(
+        normalized.as_str(),
+        "continue"
+            | "continue please"
+            | "carry on"
+            | "do it"
+            | "go"
+            | "go ahead"
+            | "go on"
+            | "keep going"
+            | "ok"
+            | "okay"
+            | "please continue"
+            | "proceed"
+            | "resume"
+            | "sure"
+            | "yes"
+            | "yep"
+            | "bare fortsett"
+            | "fortsett"
+            | "fortsett videre"
+            | "gå videre"
+            | "gjør det"
+            | "ja"
+            | "kjør"
+    )
+}
+
+fn assistant_summary_fallback(answer: &str) -> Option<String> {
+    let mut in_code_fence = false;
+    let mut visible = String::new();
+    for line in answer.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code_fence = !in_code_fence;
+            continue;
+        }
+        if in_code_fence || trimmed.starts_with("<!-- CODEX_SESSION_SUMMARY") {
+            continue;
+        }
+
+        let prose = trimmed
+            .trim_start_matches('#')
+            .trim_start()
+            .trim_start_matches(['-', '*'])
+            .trim_start();
+        if prose.is_empty() {
+            continue;
+        }
+        if !visible.is_empty() {
+            visible.push(' ');
+        }
+        visible.push_str(prose);
+    }
+
+    compact_text(&visible, MAX_SESSION_CHARS)
+        .filter(|summary| !is_generic_control_prompt(summary) && summary.chars().count() >= 12)
 }
 
 fn bounded_wrap(line: Line<'static>, width: u16, max_lines: usize) -> Vec<Line<'static>> {

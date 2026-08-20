@@ -1695,6 +1695,35 @@ async fn slash_quit_requests_exit() {
 }
 
 #[tokio::test]
+async fn slash_reload_requests_graceful_reload() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.thread_id = Some(ThreadId::new());
+
+    chat.dispatch_command(SlashCommand::Reload);
+
+    assert_matches!(rx.try_recv(), Ok(AppEvent::Exit(ExitMode::Reload)));
+}
+
+#[tokio::test]
+async fn slash_reload_waits_until_thread_is_ready() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.thread_id = None;
+
+    chat.dispatch_command(SlashCommand::Reload);
+
+    let event = rx.try_recv().expect("reload startup guard event");
+    let AppEvent::InsertHistoryCell(cell) = event else {
+        panic!("expected reload startup guard history cell, got {event:?}");
+    };
+    let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
+    assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
+    assert!(
+        rendered.contains("Session is still starting; try /reload again in a moment."),
+        "expected reload startup guard, got: {rendered:?}"
+    );
+}
+
+#[tokio::test]
 async fn slash_logout_requests_app_server_logout() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 

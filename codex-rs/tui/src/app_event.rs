@@ -1217,6 +1217,8 @@ pub(crate) struct PermissionProfileSelection {
 pub(crate) enum ExitMode {
     /// Shutdown core and exit after completion.
     ShutdownFirst,
+    /// Shutdown core, then replace the CLI process and resume this thread.
+    Reload,
     /// Exit the UI loop immediately without waiting for shutdown.
     ///
     /// This skips `Op::Shutdown`, so any in-flight work may be dropped and

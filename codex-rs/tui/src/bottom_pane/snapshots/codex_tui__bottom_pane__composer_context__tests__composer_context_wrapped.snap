@@ -5,7 +5,7 @@ expression: "format!(\"{buf:?}\")"
 Buffer {
     area: Rect { x: 0, y: 0, width: 36, height: 4 },
     content: [
-        "🧠 Session · Keeps the AI-written s…", // hidden by multi-width symbols: [(1, " ")]
+        "🧠 Session · Add the Pi-style sessi…", // hidden by multi-width symbols: [(1, " ")]
         "🧭 Last prompt · Add the Pi-style   ", // hidden by multi-width symbols: [(1, " ")]
         "  session and last prompt above the ",
         "  …                                 ",

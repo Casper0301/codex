@@ -437,6 +437,7 @@ pub(crate) enum AppRunControl {
 #[derive(Debug, Clone)]
 pub enum ExitReason {
     UserRequested,
+    Reload,
     Fatal(String),
 }
 
