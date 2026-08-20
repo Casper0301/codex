@@ -41,6 +41,7 @@ impl GitActionDirective {
 pub(crate) struct ParsedAssistantMarkdown {
     pub(crate) visible_markdown: String,
     pub(crate) git_actions: Vec<GitActionDirective>,
+    pub(crate) session_summary: Option<String>,
 }
 
 impl ParsedAssistantMarkdown {
@@ -55,9 +56,17 @@ impl ParsedAssistantMarkdown {
 pub(crate) fn parse_assistant_markdown(markdown: &str, cwd: &Path) -> ParsedAssistantMarkdown {
     let mut git_actions = Vec::new();
     let mut seen = HashSet::new();
+    let mut session_summary = None;
     let mut visible_lines = Vec::new();
 
     for line in markdown.lines() {
+        if let Some(summary) = extract_session_summary(line) {
+            session_summary = Some(summary);
+            continue;
+        }
+        if line.trim().starts_with("<!-- CODEX_SESSION_SUMMARY") {
+            continue;
+        }
         if let Some(rewritten) = rewrite_code_comment_line(line, cwd) {
             visible_lines.push(rewritten.trim_end().to_string());
             continue;
@@ -81,7 +90,35 @@ pub(crate) fn parse_assistant_markdown(markdown: &str, cwd: &Path) -> ParsedAssi
     ParsedAssistantMarkdown {
         visible_markdown: visible_lines.join("\n"),
         git_actions,
+        session_summary,
     }
+}
+
+fn extract_session_summary(line: &str) -> Option<String> {
+    const PREFIX: &str = "<!-- CODEX_SESSION_SUMMARY:";
+    const MAX_CHARS: usize = 120;
+
+    let summary = line
+        .trim()
+        .strip_prefix(PREFIX)?
+        .strip_suffix("-->")?
+        .trim();
+    let normalized = summary.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.split_whitespace().count() < 2 {
+        return None;
+    }
+    if normalized.chars().count() <= MAX_CHARS {
+        return Some(normalized);
+    }
+
+    let mut clipped = normalized
+        .chars()
+        .take(MAX_CHARS.saturating_sub(1))
+        .collect::<String>();
+    if let Some(last_space) = clipped.rfind(' ') {
+        clipped.truncate(last_space);
+    }
+    Some(format!("{}…", clipped.trim_end()))
 }
 
 fn rewrite_code_comment_line(line: &str, cwd: &Path) -> Option<String> {
@@ -293,6 +330,20 @@ mod tests {
                     cwd: "C:\\repo\\".to_string(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn extracts_and_hides_ai_session_summary_marker() {
+        let parsed = parse_assistant_markdown(
+            "The visible answer.\n\n<!-- CODEX_SESSION_SUMMARY: Restoring durable Codex and Herdr session context. -->",
+            Path::new("/repo"),
+        );
+
+        assert_eq!(parsed.visible_markdown, "The visible answer.");
+        assert_eq!(
+            parsed.session_summary.as_deref(),
+            Some("Restoring durable Codex and Herdr session context.")
         );
     }
 

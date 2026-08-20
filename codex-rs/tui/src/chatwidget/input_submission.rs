@@ -1,6 +1,10 @@
 //! User-message and shell-prompt submission behavior for `ChatWidget`.
 
 use super::*;
+use codex_app_server_protocol::AdditionalContextEntry;
+use codex_app_server_protocol::AdditionalContextKind;
+
+const SESSION_SUMMARY_CONTEXT_KEY: &str = "codex-session-summary";
 
 impl ChatWidget {
     pub(super) fn user_message_from_submission(
@@ -309,6 +313,18 @@ impl ChatWidget {
         }
 
         self.maybe_apply_ide_context(&mut items);
+        let additional_context = self
+            .bottom_pane
+            .status_line_session_summary_instruction()
+            .map(|instruction| {
+                HashMap::from([(
+                    SESSION_SUMMARY_CONTEXT_KEY.to_string(),
+                    AdditionalContextEntry {
+                        value: instruction,
+                        kind: AdditionalContextKind::Application,
+                    },
+                )])
+            });
 
         let collaboration_mode = if self.collaboration_modes_enabled() {
             self.active_collaboration_mask
@@ -337,6 +353,7 @@ impl ChatWidget {
         let active_permission_profile = self.config.permissions.active_permission_profile();
         let op = AppCommand::user_turn(
             items,
+            additional_context,
             self.config.cwd.to_path_buf(),
             AskForApproval::from(self.config.permissions.approval_policy.value()),
             active_permission_profile,

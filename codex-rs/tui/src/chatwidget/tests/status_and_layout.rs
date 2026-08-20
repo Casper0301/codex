@@ -2019,7 +2019,10 @@ async fn single_line_final_answer_hides_working_status_snapshot() {
     complete_assistant_message(
         &mut chat,
         "msg-final-single-line",
-        "1",
+        concat!(
+            "1\n",
+            "<!-- CODEX_SESSION_SUMMARY: Answering the user's request to count to one. -->",
+        ),
         Some(MessagePhase::FinalAnswer),
     );
 
@@ -3987,6 +3990,132 @@ async fn renamed_thread_footer_title_snapshot() {
         "renamed_thread_footer_title",
         normalized_backend_snapshot(terminal.backend())
     );
+}
+
+#[tokio::test]
+async fn status_line_context_renders_session_and_last_prompt_above_composer() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
+    chat.show_welcome_banner = false;
+    chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
+    chat.refresh_status_line();
+
+    let thread_id = ThreadId::new();
+    chat.thread_id = Some(thread_id);
+    chat.handle_server_notification(
+        ServerNotification::ThreadNameUpdated(
+            codex_app_server_protocol::ThreadNameUpdatedNotification {
+                thread_id: thread_id.to_string(),
+                thread_name: Some("Status line context".to_string()),
+            },
+        ),
+        /*replay_kind*/ None,
+    );
+    chat.on_user_message_display(ChatWidget::user_message_display_from_parts(
+        "Add the Pi-style context block above the composer.".to_string(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ));
+    chat.on_agent_message_item_completed(
+        AgentMessageItem {
+            id: "summary-message".to_string(),
+            content: vec![AgentMessageContent::Text {
+                text: concat!(
+                    "The visible answer stays clean.\n\n",
+                    "<!-- CODEX_SESSION_SUMMARY: Codex keeps the AI-written session summary separate from its thread name. -->",
+                )
+                .to_string(),
+            }],
+            phase: Some(MessagePhase::FinalAnswer),
+            memory_citation: None,
+        },
+        "summary-turn",
+        /*from_replay*/ false,
+    );
+
+    let width = 80;
+    let height = chat.desired_height(width);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("create terminal");
+    terminal
+        .draw(|f| chat.render(f.area(), f.buffer_mut()))
+        .expect("draw status-line context");
+    let rendered = normalized_backend_snapshot(terminal.backend());
+
+    assert!(
+        rendered.contains("🧠 Session · Codex keeps the AI-written session summary separate from")
+    );
+    assert!(!rendered.contains("🧠 Session · Status line context"));
+    assert!(
+        rendered.contains("🧭 Last prompt · Add the Pi-style context block above the composer.")
+    );
+    assert_chatwidget_snapshot!("status_line_context_above_composer", rendered);
+}
+
+#[tokio::test]
+async fn replay_restores_latest_ai_session_summary() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
+    chat.show_welcome_banner = false;
+    chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
+    chat.refresh_status_line();
+
+    replay_user_message_text(
+        &mut chat,
+        "prompt-replayed",
+        concat!(
+            "<persistent_session_summary>hidden instruction</persistent_session_summary>\n",
+            "## My request for Codex:\n",
+            "Restore this exact last prompt from replay.",
+        ),
+        ReplayKind::ResumeInitialMessages,
+    );
+
+    for (id, text) in [
+        (
+            "summary-old",
+            concat!(
+                "Earlier answer.\n",
+                "<!-- CODEX_SESSION_SUMMARY: Codex first restored the previous session objective. -->",
+            ),
+        ),
+        (
+            "summary-latest",
+            concat!(
+                "Latest answer.\n",
+                "<!-- CODEX_SESSION_SUMMARY: Codex restored the latest AI-written session summary from replay. -->",
+            ),
+        ),
+    ] {
+        chat.replay_thread_item(
+            AppServerThreadItem::AgentMessage {
+                id: id.to_string(),
+                text: text.to_string(),
+                phase: Some(MessagePhase::FinalAnswer),
+                memory_citation: None,
+            },
+            "replayed-turn".to_string(),
+            ReplayKind::ResumeInitialMessages,
+        );
+    }
+
+    let width = 80;
+    let height = chat.desired_height(width);
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("create terminal");
+    terminal
+        .draw(|f| chat.render(f.area(), f.buffer_mut()))
+        .expect("draw replayed context");
+    let rendered = normalized_backend_snapshot(terminal.backend());
+
+    assert!(rendered.contains(
+        "🧠 Session · Codex restored the latest AI-written session summary from replay."
+    ));
+    assert!(rendered.contains("🧭 Last prompt · Restore this exact last prompt from replay."));
+    assert!(!rendered.contains("Codex first restored the previous session objective."));
 }
 
 #[tokio::test]

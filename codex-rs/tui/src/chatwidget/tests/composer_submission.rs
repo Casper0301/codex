@@ -10,6 +10,47 @@ use pretty_assertions::assert_eq;
 use std::collections::VecDeque;
 
 #[tokio::test]
+async fn submitted_turn_includes_hidden_session_summary_instruction() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(Some("gpt-5")).await;
+    chat.thread_id = Some(ThreadId::new());
+    chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
+    chat.refresh_status_line();
+    chat.bottom_pane.set_composer_text(
+        "Keep this prompt visible.".to_string(),
+        Vec::new(),
+        Vec::new(),
+    );
+
+    chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    let op = next_submit_op(&mut op_rx);
+    let items = match &op {
+        Op::UserTurn { items, .. } => items,
+        other => panic!("expected Op::UserTurn, got {other:?}"),
+    };
+    assert_eq!(
+        ChatWidget::user_message_display_from_inputs(items).message,
+        "Keep this prompt visible."
+    );
+    assert_eq!(
+        items,
+        &vec![UserInput::Text {
+            text: "Keep this prompt visible.".to_string(),
+            text_elements: Vec::new(),
+        }]
+    );
+
+    let serialized = serde_json::to_value(op).expect("serialize submitted turn");
+    let summary_context = &serialized["UserTurn"]["additional_context"]["codex-session-summary"];
+    assert_eq!(summary_context["kind"], "application");
+    assert!(
+        summary_context["value"]
+            .as_str()
+            .is_some_and(|value| value.contains("CODEX_SESSION_SUMMARY"))
+    );
+}
+
+#[tokio::test]
 async fn parent_owned_thread_blocks_all_direct_input_entry_points() {
     let (mut chat, mut rx, mut op_rx) =
         make_chatwidget_manual(/*model_override*/ Some("gpt-5")).await;

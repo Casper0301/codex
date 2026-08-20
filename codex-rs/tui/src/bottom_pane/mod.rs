@@ -102,6 +102,7 @@ pub(crate) struct MentionBinding {
 mod chat_composer;
 mod chat_composer_history;
 mod command_popup;
+mod composer_context;
 pub(crate) mod custom_prompt_view;
 mod effort_status_line;
 mod experimental_features_view;
@@ -199,6 +200,7 @@ pub(crate) use chat_composer::ComposerDraftSnapshot;
 pub(crate) use chat_composer::InputResult;
 pub(crate) use chat_composer::QueuedInputAction;
 pub(crate) use chat_composer_history::HistoryEntry;
+use composer_context::ComposerContext;
 
 use crate::status_indicator_widget::StatusDetailsCapitalization;
 use crate::status_indicator_widget::StatusIndicatorWidget;
@@ -249,6 +251,8 @@ pub(crate) struct BottomPane {
     unified_exec_footer: UnifiedExecFooter,
     /// Preview of pending steers and queued drafts shown above the composer.
     pending_input_preview: PendingInputPreview,
+    /// AI-written session summary and latest user prompt shown immediately above the composer.
+    composer_context: ComposerContext,
     /// Inactive threads with pending approval requests.
     pending_thread_approvals: PendingThreadApprovals,
     context_window_percent: Option<i64>,
@@ -314,6 +318,7 @@ impl BottomPane {
             status: None,
             unified_exec_footer: UnifiedExecFooter::new(),
             pending_input_preview: PendingInputPreview::new(),
+            composer_context: ComposerContext::new(),
             pending_thread_approvals: PendingThreadApprovals::new(),
             esc_backtrack_hint: false,
             animations_enabled,
@@ -1802,6 +1807,10 @@ impl BottomPane {
             if !has_inline_previews && has_status_or_footer {
                 flex.push(/*flex*/ 0, RenderableItem::Owned("".into()));
             }
+            flex.push(
+                /*flex*/ 0,
+                RenderableItem::Borrowed(&self.composer_context),
+            );
             let mut flex2 = FlexRenderable::new();
             flex2.push(/*flex*/ 1, RenderableItem::Owned(flex.into()));
             let composer: RenderableItem<'_> = if composer_right_reserve == 0 {
@@ -1830,7 +1839,30 @@ impl BottomPane {
     }
 
     pub(crate) fn set_status_line_enabled(&mut self, enabled: bool) {
-        if self.composer.set_status_line_enabled(enabled) {
+        let composer_changed = self.composer.set_status_line_enabled(enabled);
+        let context_changed = self.composer_context.set_enabled(enabled);
+        if composer_changed || context_changed {
+            self.request_redraw();
+        }
+    }
+
+    pub(crate) fn reset_status_line_context(&mut self) {
+        self.composer_context.reset_session();
+        self.request_redraw();
+    }
+
+    pub(crate) fn set_status_line_session_summary(&mut self, summary: &str) {
+        if self.composer_context.set_session_summary(summary) {
+            self.request_redraw();
+        }
+    }
+
+    pub(crate) fn status_line_session_summary_instruction(&self) -> Option<String> {
+        self.composer_context.session_summary_instruction()
+    }
+
+    pub(crate) fn set_status_line_last_prompt(&mut self, prompt: &str) {
+        if self.composer_context.set_last_prompt(prompt) {
             self.request_redraw();
         }
     }

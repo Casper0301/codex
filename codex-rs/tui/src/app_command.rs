@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
+use codex_app_server_protocol::AdditionalContextEntry;
 use codex_app_server_protocol::AskForApproval;
 use codex_app_server_protocol::CommandExecutionApprovalDecision;
 use codex_app_server_protocol::FileChangeApprovalDecision;
@@ -31,6 +33,7 @@ pub(crate) enum AppCommand {
     },
     UserTurn {
         items: Vec<UserInput>,
+        additional_context: Option<HashMap<String, AdditionalContextEntry>>,
         cwd: PathBuf,
         approval_policy: AskForApproval,
         approvals_reviewer: Option<ApprovalsReviewer>,
@@ -114,6 +117,7 @@ impl AppCommand {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn user_turn(
         items: Vec<UserInput>,
+        additional_context: Option<HashMap<String, AdditionalContextEntry>>,
         cwd: PathBuf,
         approval_policy: AskForApproval,
         active_permission_profile: Option<ActivePermissionProfile>,
@@ -127,6 +131,7 @@ impl AppCommand {
     ) -> Self {
         Self::UserTurn {
             items,
+            additional_context,
             cwd,
             approval_policy,
             approvals_reviewer: None,

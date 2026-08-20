@@ -1336,6 +1336,14 @@ impl ChatWidget {
 
     fn on_user_message_display(&mut self, display: UserMessageDisplay) {
         self.last_rendered_user_message_display = Some(display.clone());
+        let prompt = if display.message.trim().is_empty()
+            && (!display.local_images.is_empty() || !display.remote_image_urls.is_empty())
+        {
+            "[image prompt]"
+        } else {
+            display.message.as_str()
+        };
+        self.bottom_pane.set_status_line_last_prompt(prompt);
         if !display.message.trim().is_empty()
             || !display.text_elements.is_empty()
             || !display.local_images.is_empty()

@@ -32,6 +32,7 @@ impl ChatWidget {
         self.turn_lifecycle.reset_thread();
         self.clear_safety_buffering();
         self.thread_name = session.thread_name.clone();
+        self.bottom_pane.reset_status_line_context();
         self.current_goal_status_indicator = None;
         self.current_goal_status = None;
         self.update_collaboration_mode_indicator();

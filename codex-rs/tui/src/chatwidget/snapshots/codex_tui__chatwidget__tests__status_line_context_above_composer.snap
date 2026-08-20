@@ -1,10 +1,11 @@
 ---
 source: tui/src/chatwidget/tests/status_and_layout.rs
-assertion_line: 3986
-expression: normalized_backend_snapshot(terminal.backend())
+expression: rendered
 ---
 "                                                                                "
+"🧠 Session · Codex keeps the AI-written session summary separate from its threa…" Hidden by multi-width symbols: [(1, " ")]
+"🧭 Last prompt · Add the Pi-style context block above the composer.             " Hidden by multi-width symbols: [(1, " ")]
 "                                                                                "
 "› Ask Codex to do anything                                                      "
 "                                                                                "
-"  gpt-5.2 high · Roadmap cleanup                                                "
+"  gpt-5.2 default                                                               "

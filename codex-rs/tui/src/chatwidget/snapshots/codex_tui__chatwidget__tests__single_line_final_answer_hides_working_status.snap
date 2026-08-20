@@ -1,13 +1,14 @@
 ---
 source: tui/src/chatwidget/tests/status_and_layout.rs
+assertion_line: 2045
 expression: normalize_snapshot_paths(terminal.backend().vt100().screen().contents())
 ---
-
-› count to 1
 
 
 • 1
 
+🧠 Session · Waiting for first response
+🧭 Last prompt · count to 1
 
 › Ask Codex to do anything
 
